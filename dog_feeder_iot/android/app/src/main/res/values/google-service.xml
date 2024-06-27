@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="google_app_id">1:756617881543:android:0bc25f3ea37b9e2a7bdbe2</string>
+    <string name="google_api_key">AIzaSyDs5wMndeNPMLQgIjgOd1nFOjDIS9BjTnU</string>
+    <string name="firebase_database_url">https://dog-feeder-49c28.firebaseio.com</string>
+    <string name="gcm_defaultSenderId">756617881543</string>
+    <string name="project_id">dog-feeder-49c28</string>
+    <string name="storage_bucket">dog-feeder-49c28.appspot.com</string>
+    <string name="location_id">us-central</string>
+</resources>
