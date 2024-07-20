@@ -3,21 +3,20 @@
 #include <time.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SH110X.h>
-#include <Arduino.h>
-#include "HX711.h"
+#include <AccelStepper.h>
+#include <HX711.h>
+
+//some constants for motor
+const int DIR_PIN = 12;
+const int STEP_PIN = 14;
+const int steps_per_rev = 200;
 
 // HX711 circuit wiring
 const int LOADCELL_DOUT_PIN = 16;
 const int LOADCELL_SCK_PIN = 4;
-
 HX711 scale;
 
-// some constants for motor
-const int DIR = 12;
-const int STEP = 14;
-const int steps_per_rev = 200;
-
-// some constants for AP
+//some constants for AP
 const char* ssid_ap = "ESP32-Access-Point";
 const char* password_ap = "123456789";
 
@@ -28,6 +27,7 @@ AsyncWebServer server(80);
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
 #define OLED_RESET -1
+#define motorInterfaceType 1
 Adafruit_SH1106G display = Adafruit_SH1106G(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 // HTML form to get Wi-Fi credentials
@@ -56,79 +56,75 @@ bool ntp_initialized = false;
 // Flag to indicate if the function has been called for the current day
 bool function_called_today = false;
 
+// Flag to stop the motor if weight exceeds limit
+volatile bool stop_motor = false;
+
+unsigned long previousMillis = 0; // store last time HX711 was read
+unsigned long previousMillis2 = 0; // store last time HX711 was read
+const long interval = 1000; // interval to read HX711 (milliseconds)
+
+unsigned long motorPreviousMillis = 0; // store last time motor was moved
+const long motorInterval = 1000; // interval to control motor speed (microseconds)
+
+const float calibration_factor = 406.91;
+
+int motor_speed = 0;
+
+//initialize motor
+AccelStepper stepper(motorInterfaceType, STEP_PIN, DIR_PIN);
+
 void setup() {
   Serial.begin(115200);
+  delay(5000);
 
-  // initialize scale
-  setCpuFrequencyMhz(80);
-  Serial.println("HX711 Demo");
+  
+  // Initialize the stepper motor
+  stepper.setMaxSpeed(2000);   // Set maximum speed
+  stepper.setAcceleration(1000); // Set acceleration
+  
 
-  Serial.println("Initializing the scale");
-
-  scale.begin(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN);
-
-  Serial.println("Before setting up the scale:");
-  Serial.print("read: \t\t");
-  Serial.println(scale.read());      // print a raw reading from the ADC
-
-  Serial.print("read average: \t\t");
-  Serial.println(scale.read_average(20));   // print the average of 20 readings from the ADC
-
-  Serial.print("get value: \t\t");
-  Serial.println(scale.get_value(5));   // print the average of 5 readings from the ADC minus the tare weight (not set yet)
-
-  Serial.print("get units: \t\t");
-  Serial.println(scale.get_units(5), 1);  // print the average of 5 readings from the ADC minus tare weight (not set) divided
-            // by the SCALE parameter (not set yet)
-            
-  scale.set_scale(459.542);
-  scale.tare();  // reset the scale to 0
-
-  Serial.println("After setting up the scale:");
-
-  Serial.print("read: \t\t");
-  Serial.println(scale.read());  // print a raw reading from the ADC
-
-  Serial.print("read average: \t\t");
-  Serial.println(scale.read_average(20));  // print the average of 20 readings from the ADC
-
-  Serial.print("get value: \t\t");
-  Serial.println(scale.get_value(5));  // print the average of 5 readings from the ADC minus the tare weight, set with tare()
-
-  Serial.print("get units: \t\t");
-  Serial.println(scale.get_units(5), 1);  // print the average of 5 readings from the ADC minus tare weight, divided by the SCALE parameter set with set_scale
-
-  Serial.println("READY, BABY!");
-  Serial.println("Readings:");
-
-  // initialize motor
-  pinMode(STEP, OUTPUT);
-  pinMode(DIR, OUTPUT);
-  digitalWrite(DIR, HIGH);  // Set the direction to clockwise
+  // Create an instance of the stepper motor
+  // pinMode(STEP, OUTPUT);
+  // pinMode(DIR, OUTPUT);
+  // digitalWrite(DIR, HIGH);  // Set the direction to clockwise
 
   // Initialize the OLED display
-  if (!display.begin(i2c_Address, true)) {
+  if(!display.begin(i2c_Address, true)) {
     Serial.println(F("SH1106 allocation failed"));
-    for (;;);
+    for(;;);
   }
   display.clearDisplay();
   display.setTextColor(SH110X_WHITE);
-  display.setTextSize(1);  // Increase text size
-  display.setCursor(0, 20);
+  display.setTextSize(1); // Increase text size
+  display.setCursor(0,20);
   display.print("connecting...");
   display.display();
+
+  // Initialize the HX711 scale
+
+  scale.begin(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN);
+  scale.set_scale(calibration_factor); // Set the calibration factor
+  scale.tare();  // Zero the scale
+
+
+  // Check if the scale is ready
+  if (scale.is_ready()) {
+    Serial.println("HX711 is ready.");
+  } else {
+    Serial.println("HX711 not found.");
+  }
 
   // Setting up the ESP32 as an Access Point
   WiFi.softAP(ssid_ap, password_ap);
   Serial.println("Access Point started");
 
   // Route for root / web page
-  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
     request->send(200, "text/html", html_form);
   });
 
   // Route to get the Wi-Fi credentials
-  server.on("/get", HTTP_GET, [](AsyncWebServerRequest *request) {
+  server.on("/get", HTTP_GET, [](AsyncWebServerRequest *request){
     if (request->hasParam("ssid") && request->hasParam("password")) {
       wifi_ssid = request->getParam("ssid")->value();
       wifi_password = request->getParam("password")->value();
@@ -155,20 +151,41 @@ void mySpecificFunction() {
 
   Serial.println("Spinning Clockwise...");
 
-  while (true) {  // Continuous loop
-    digitalWrite(STEP, HIGH);
-    delayMicroseconds(500);  // Shorter delay for higher speed
-    digitalWrite(STEP, LOW);
-    delayMicroseconds(500);
-
-    if (scale.get_units(10) > 200) {
-      Serial.println("OUTTA THERE");
-      break;
-    }
-  }
+  motor_speed = 500;
 }
 
+  
+
+  // unsigned long motorPreviousMillis = micros(); // start timing for motor control
+  // while (!stop_motor) // Continuous loop until stop_motor is true
+  // {
+  //   unsigned long currentMicros = micros();
+  //   if (currentMicros - motorPreviousMillis >= motorInterval) {
+  //     motorPreviousMillis = currentMicros;
+  //     digitalWrite(STEP, HIGH);
+  //     delayMicroseconds(500); // Shorter delay for higher speed
+  //     digitalWrite(STEP, LOW);
+  //     delayMicroseconds(500);
+  //   }
+  //   float weight = scale.get_units();
+  //   Serial.print("Weight: ");
+  //   Serial.print(weight);
+  //   Serial.println(" grams");
+
+  //   if (weight > 200) {
+  //     stop_motor = true;
+  //   } else {
+  //     Serial.println("HX711 not found.");
+  //   }
+  // }
+
+//   Serial.println("Motor stopped due to weight limit.");
+// }
+
 void loop() {
+
+  unsigned long currentMillis = millis();
+
   // Check if connected to Wi-Fi
   if (WiFi.status() == WL_CONNECTED && !ntp_initialized) {
     Serial.println("Connected to the WiFi network");
@@ -176,34 +193,41 @@ void loop() {
     // Display message on OLED
     display.clearDisplay();
     display.setTextColor(SH110X_WHITE);
-    display.setTextSize(2);  // Increase text size
-    display.setCursor(0, 0);
+    display.setTextSize(2); // Increase text size
+    display.setCursor(0,0);
     display.print("Successful");
-    display.setCursor(0, 20);  // Move to next line
+    display.setCursor(0, 20); // Move to next line
     display.print("Connection");
-    display.setCursor(0, 40);  // Move to next line
+    display.setCursor(0, 40); // Move to next line
     display.print(" :)");
     display.display();
 
     // Initialize NTP
-    configTime(0, 0, "pool.ntp.org", "time.nist.gov");
-
+    configTime(10800, 0, "pool.ntp.org", "time.nist.gov");
+    
     // Set timezone for Israel (UTC+3)
     setenv("TZ", "IST-2IDT,M3.4.4/26,M10.5.0", 1);
     tzset();
 
     ntp_initialized = true;
+    delay(15000);
   }
+
+  stepper.setSpeed(motor_speed); // Set speed (positive for clockwise, negative for counterclockwise)
+  stepper.runSpeed();
 
   // If NTP is initialized, get and print current time
   if (ntp_initialized) {
     time_t now;
     struct tm timeinfo;
-    if (getLocalTime(&timeinfo, 20000)) {  // Increase timeout to 10 seconds
-      Serial.println(&timeinfo, "%A, %B %d %Y %H:%M:%S");
+    if (getLocalTime(&timeinfo)) {
+      if(currentMillis - previousMillis2 >= interval){
+        previousMillis2 = currentMillis;
+        Serial.println(&timeinfo, "%A, %B %d %Y %H:%M:%S");
+      }
 
-      // Check if the current time is 19:00 and if the function has not been called today
-      if (timeinfo.tm_hour == 22 && timeinfo.tm_min == 30 && !function_called_today) {
+      // Check if the current time is 13:00 and if the function has not been called today
+      if (timeinfo.tm_hour == 12 && timeinfo.tm_min == 03 && !function_called_today) {
         mySpecificFunction();
         function_called_today = true;
       }
@@ -217,15 +241,22 @@ void loop() {
     }
   }
 
-  delay(1000);  // Print time every 1 second
+  // Read the weight from HX711 every second
+  if (currentMillis - previousMillis >= interval) {
+    previousMillis = currentMillis;
 
-  // scale prints
-  Serial.print("one reading:\t");
-  Serial.print(scale.get_units(), 1);
-  Serial.print("\t| average:\t");
-  Serial.println(scale.get_units(10), 5);
+    if (scale.is_ready()) {
+      float weight = scale.get_units();
+      Serial.print("Weight: ");
+      Serial.print(weight);
+      Serial.println(" grams");
 
-  scale.power_down();  // put the ADC in sleep mode
-  delay(5000);
-  scale.power_up();
+      if (weight > 200) {
+        motor_speed = 0;
+        Serial.println("Motor stopped due to weight limit.");
+      }
+    } else {
+      Serial.println("HX711 not found.");
+    }
+  }
 }
