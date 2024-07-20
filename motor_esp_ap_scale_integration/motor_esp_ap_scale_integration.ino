@@ -146,12 +146,19 @@ void setup() {
 }
 
 void mySpecificFunction() {
-  Serial.println("The specific function has been called!");
   // Add your specific function logic here
-
+  motor_speed = 500; // put minus to change direction
   Serial.println("Spinning Clockwise...");
 
-  motor_speed = 500;
+  // print message to OLED
+  display.clearDisplay();
+  display.setTextColor(SH110X_WHITE);
+  display.setTextSize(1);
+  display.setCursor(0,20);
+  display.print("motor is running");
+  display.display(); 
+
+
 }
 
   
@@ -227,7 +234,7 @@ void loop() {
       }
 
       // Check if the current time is 13:00 and if the function has not been called today
-      if (timeinfo.tm_hour == 12 && timeinfo.tm_min == 03 && !function_called_today) {
+      if (timeinfo.tm_hour == 14 && timeinfo.tm_min == 7 && !function_called_today) {
         mySpecificFunction();
         function_called_today = true;
       }
@@ -254,6 +261,16 @@ void loop() {
       if (weight > 200) {
         motor_speed = 0;
         Serial.println("Motor stopped due to weight limit.");
+        display.clearDisplay();
+        display.setTextColor(SH110X_WHITE);
+        display.setTextSize(1);
+        display.setCursor(0,0);
+        display.print("Weight limit");
+        display.setCursor(0,20);
+        display.print("reached,");
+        display.setCursor(0,40);
+        display.print("motor stopped");
+        display.display();                      
       }
     } else {
       Serial.println("HX711 not found.");
