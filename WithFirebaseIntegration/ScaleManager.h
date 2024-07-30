@@ -1,3 +1,6 @@
+#ifndef SCALEMANAGER_H
+#define SCALEMANAGER_H
+
 #include <HX711.h>
 
 // HX711 circuit wiring
@@ -9,3 +12,4 @@ extern HX711 scale;
 void initScale();
 float readWeight();
 
+#endif

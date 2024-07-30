@@ -1,3 +1,7 @@
+
+#ifndef WIFIMANAGER_H
+#define WIFIMANAGER_H
+
 #include <WiFi.h>
 #include <ESPAsyncWebServer.h>
 
@@ -16,3 +20,5 @@ extern const char* html_form;
 extern AsyncWebServer server;
 
 void initWifi();
+
+#endif

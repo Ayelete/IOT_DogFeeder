@@ -1,3 +1,5 @@
+#ifndef MOTORMANAGER_H
+#define MOTORMANAGER_H
 
 #include <AccelStepper.h>
 
@@ -12,3 +14,4 @@ void setMotorSpeed(int speed);
 void runMotor();
 void stopMotor(); 
 
+#endif

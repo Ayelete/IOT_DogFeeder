@@ -1,5 +1,11 @@
 #include "FirebaseManager.h"
 
+// void tokenStatusCallback(TokenInfo info) {
+//   Serial.printf("Token Info: type = %s, status = %s\n", 
+//                 getTokenType(info.token_type).c_str(), 
+//                 getTokenStatus(info.status).c_str());
+// }
+
 // Initialize Firebase objects
 FirebaseData fbdo;
 FirebaseAuth auth;
@@ -18,9 +24,9 @@ void initFirebase()
     //Assign the Firestore URL
    // config.database_url = "https://" FIREBASE_PROJECT_ID ".firebasedatabase.app"
 
-    //Token generation process indo
-    config.token_status_callback = tokenStatusCalback;
+    // //Token generation process indo
+    // config.token_status_callback = tokenStatusCallback;
     
-    Firebase.begin(config, auth);
+    Firebase.begin(&config, &auth);
     Firebase.reconnectWiFi(true);
 }

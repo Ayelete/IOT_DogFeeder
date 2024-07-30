@@ -1,11 +1,11 @@
 #ifndef FIREBASEMANAGER_H
 #define FIREBASEMANAGER_H
 
-#include <Firebase_ESP_Client.h>
+#include <FirebaseESP32.h>
 #include <ArduinoJson.h>
 
-// Provide the token generation process info.
-#include <addons/TokenHelper.h>
+// // Provide the token generation process info.
+// #include <addons/TokenHelper.h>
 
 // Firebase credentials and configuration
 #define API_KEY "AIzaSyDQT20WMQz3lA-W4CJ4WLdKAYn_jy2Kj64"

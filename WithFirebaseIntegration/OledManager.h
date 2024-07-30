@@ -1,3 +1,5 @@
+#ifndef OLEDMANAGER_H
+#define OLEDMANAGER_H
 
 #include <Adafruit_GFX.h>
 #include <Adafruit_SH110X.h>
@@ -18,3 +20,4 @@ void clearDisplay();
 
 extern Adafruit_SH1106G display;
 
+#endif
