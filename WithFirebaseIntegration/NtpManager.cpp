@@ -10,7 +10,7 @@ bool ntp_initialized = false;
 
 void initNtp() 
 {
-  if (WiFi.status() == WL_CONNECTED && !ntp_initialized) {
+  if (WiFi.status() == WL_CONNECTED && !ntp_initialized){
     Serial.println("Connected to the WiFi network");
     displayConnectingMessage();
 
@@ -22,8 +22,9 @@ void initNtp()
 
     ntp_initialized = true;
     delay(15000);
-  }
+  } 
 }
+
 
 void updateTime() 
 {

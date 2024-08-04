@@ -12,11 +12,11 @@ void initScale() {
     
     // Check if the scale is ready
     if (scale.is_ready()) {
-        Serial.println("HX711 is ready.");
+        Serial.println(F("HX711 is ready."));
         scale.set_scale(calibration_factor); // Set the calibration factor
         scale.tare();  // Zero the scale
     } else {
-        Serial.println("HX711 not found.");
+        Serial.println(F("HX711 not found."));
     }
 }
 
@@ -24,7 +24,7 @@ float readWeight() {
     if (scale.is_ready()) {
         return scale.get_units();
     } else {
-        Serial.println("HX711 not found.");
+        Serial.println(F("HX711 not found."));
         return 0.0;
     }
 }

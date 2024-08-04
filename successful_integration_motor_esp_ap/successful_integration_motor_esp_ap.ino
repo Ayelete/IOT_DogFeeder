@@ -152,7 +152,7 @@ void loop() {
       Serial.println(&timeinfo, "%A, %B %d %Y %H:%M:%S");
 
       // Check if the current time is 13:00 and if the function has not been called today
-      if (timeinfo.tm_hour == 18 && timeinfo.tm_min == 49 && !function_called_today) {
+      if (timeinfo.tm_hour == 13 && timeinfo.tm_min == 35 && !function_called_today) {
         mySpecificFunction();
         function_called_today = true;
       }

@@ -30,7 +30,7 @@ AsyncWebServer server(80);
 void initWifi() {
     // Setting up the ESP32 as an Access Point
     WiFi.softAP(ssid_ap, password_ap);
-    Serial.println("Access Point started");
+    Serial.println(F("Access Point started"));
 
     // Route for root / web page
     server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){

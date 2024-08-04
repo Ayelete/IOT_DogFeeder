@@ -79,9 +79,9 @@ void loop()
   {
     previousMillis = currentMillis;
     float weight = readWeight();
-    Serial.print("Weight: ");
+    Serial.print(F("Weight: "));
     Serial.print(weight);
-    Serial.println(" grams");
+    Serial.println(F(" grams"));
 
   }
 }
@@ -93,7 +93,7 @@ void checkIfItsFoodTimeAndIfYesEnjoy(const char* data, const String& mealName)
 
     if (error) 
     {
-        Serial.print("Failed to parse JSON: ");
+        Serial.print(F("Failed to parse JSON: "));
         Serial.println(error.c_str());
         return;
     }
@@ -101,7 +101,7 @@ void checkIfItsFoodTimeAndIfYesEnjoy(const char* data, const String& mealName)
     struct tm timeinfo;
     if (!getLocalTime(&timeinfo)) 
     {
-        Serial.println("Failed to obtain time");
+        Serial.println(F("Failed to obtain time"));
         return;
     }
 
@@ -122,22 +122,22 @@ void checkIfItsFoodTimeAndIfYesEnjoy(const char* data, const String& mealName)
 void runMotorUntilLimit(int amount) 
 {
     motor_speed = 500; // Adjust as needed
-    Serial.println("Spinning Clockwise...");
+    Serial.println(F("Spinning Clockwise..."));
     is_motor_running = true;
     displayMotorRunning();
 
     while (is_motor_running) 
     {
         weight = readWeight();
-        Serial.print("Weight: ");
+        Serial.print(F("Weight: "));
         Serial.print(weight);
-        Serial.println(" grams");
+        Serial.println(F(" grams"));
 
         if (weight > amount) 
         {
             stopMotor();
             is_motor_running = false;
-            Serial.println("Motor stopped due to weight limit.");
+            Serial.println(F("Motor stopped due to weight limit."));
             displayWeightLimit();                      
         }
 
@@ -169,7 +169,7 @@ void processMeals()
   }
   else
   {
-    Serial.print("Failed to get data from collection: ");
+    Serial.print(F("Failed to get data from collection: "));
     Serial.println(FirebaseData.errorReason());
   }
 }

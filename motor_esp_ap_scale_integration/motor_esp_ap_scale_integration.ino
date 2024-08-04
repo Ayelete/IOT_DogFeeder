@@ -31,24 +31,74 @@ AsyncWebServer server(80);
 Adafruit_SH1106G display = Adafruit_SH1106G(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 // HTML form to get Wi-Fi credentials
+
 const char* html_form = R"rawliteral(
-<!DOCTYPE HTML><html>
+<!DOCTYPE HTML>
+<html>
 <head>
   <title>ESP32 Wi-Fi Config</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f4f4f4;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
+    .container {
+      background-color: #fff;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      width: 300px;
+      text-align: center;
+    }
+    h2 {
+      margin-bottom: 20px;
+      color: #333;
+    }
+    input[type="text"],
+    input[type="password"] {
+      width: calc(100% - 20px);
+      padding: 10px;
+      margin-bottom: 20px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+    input[type="submit"] {
+      background-color: #4CAF50;
+      color: white;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    input[type="submit"]:hover {
+      background-color: #45a049;
+    }
+  </style>
 </head>
 <body>
-  <h2>Enter Wi-Fi Credentials</h2>
-  <form action="/get">
-    SSID: <input type="text" name="ssid"><br>
-    Password: <input type="password" name="password"><br>
-    <input type="submit" value="Submit">
-  </form>
+  <div class="container">
+    <h2>Enter Wi-Fi Credentials</h2>
+    <form action="/get">
+      <input type="text" name="ssid" placeholder="SSID"><br>
+      <input type="password" name="password" placeholder="Password"><br>
+      <input type="submit" value="Submit">
+    </form>
+  </div>
 </body>
 </html>)rawliteral";
 
-// Variables to store Wi-Fi credentials
+
 String wifi_ssid;
 String wifi_password;
+bool connectAttempt = false;
+unsigned long connectStartTime = 0;
+const unsigned long connectTimeout = 10000; // 10 seconds timeout
+
 
 // Flag to indicate if NTP time is initialized
 bool ntp_initialized = false;
@@ -69,6 +119,7 @@ const long motorInterval = 1000; // interval to control motor speed (microsecond
 const float calibration_factor = 406.91;
 
 int motor_speed = 0;
+bool motor_is_on = false;
 
 //initialize motor
 AccelStepper stepper(motorInterfaceType, STEP_PIN, DIR_PIN);
@@ -82,11 +133,6 @@ void setup() {
   stepper.setMaxSpeed(2000);   // Set maximum speed
   stepper.setAcceleration(1000); // Set acceleration
   
-
-  // Create an instance of the stepper motor
-  // pinMode(STEP, OUTPUT);
-  // pinMode(DIR, OUTPUT);
-  // digitalWrite(DIR, HIGH);  // Set the direction to clockwise
 
   // Initialize the OLED display
   if(!display.begin(i2c_Address, true)) {
@@ -107,13 +153,6 @@ void setup() {
   scale.tare();  // Zero the scale
 
 
-  // Check if the scale is ready
-  if (scale.is_ready()) {
-    Serial.println("HX711 is ready.");
-  } else {
-    Serial.println("HX711 not found.");
-  }
-
   // Setting up the ESP32 as an Access Point
   WiFi.softAP(ssid_ap, password_ap);
   Serial.println("Access Point started");
@@ -128,14 +167,14 @@ void setup() {
     if (request->hasParam("ssid") && request->hasParam("password")) {
       wifi_ssid = request->getParam("ssid")->value();
       wifi_password = request->getParam("password")->value();
-      
+
       request->send(200, "text/html", "Credentials received, trying to connect...");
-      
-      // Disconnect from any current Wi-Fi connection
+
+      // Initiate connection attempt
       WiFi.disconnect();
-      
-      // Connect to the new Wi-Fi network
       WiFi.begin(wifi_ssid.c_str(), wifi_password.c_str());
+      connectAttempt = true;
+      connectStartTime = millis();
     } else {
       request->send(200, "text/html", "Error: Missing SSID or Password");
     }
@@ -147,8 +186,9 @@ void setup() {
 
 void mySpecificFunction() {
   // Add your specific function logic here
-  motor_speed = 500; // put minus to change direction
+  motor_speed = -500; // put minus to change direction
   Serial.println("Spinning Clockwise...");
+  motor_is_on = true;
 
   // print message to OLED
   display.clearDisplay();
@@ -158,44 +198,34 @@ void mySpecificFunction() {
   display.print("motor is running");
   display.display(); 
 
-
 }
 
-  
-
-  // unsigned long motorPreviousMillis = micros(); // start timing for motor control
-  // while (!stop_motor) // Continuous loop until stop_motor is true
-  // {
-  //   unsigned long currentMicros = micros();
-  //   if (currentMicros - motorPreviousMillis >= motorInterval) {
-  //     motorPreviousMillis = currentMicros;
-  //     digitalWrite(STEP, HIGH);
-  //     delayMicroseconds(500); // Shorter delay for higher speed
-  //     digitalWrite(STEP, LOW);
-  //     delayMicroseconds(500);
-  //   }
-  //   float weight = scale.get_units();
-  //   Serial.print("Weight: ");
-  //   Serial.print(weight);
-  //   Serial.println(" grams");
-
-  //   if (weight > 200) {
-  //     stop_motor = true;
-  //   } else {
-  //     Serial.println("HX711 not found.");
-  //   }
-  // }
-
-//   Serial.println("Motor stopped due to weight limit.");
-// }
 
 void loop() {
 
   unsigned long currentMillis = millis();
 
+  // Handle Wi-Fi connection attempts
+  if (connectAttempt) {
+    if (WiFi.status() == WL_CONNECTED) {
+      connectAttempt = false;
+      Serial.println("Connected to Wi-Fi successfully!");
+      // Inform the user of success
+      server.on("/status", HTTP_GET, [](AsyncWebServerRequest *request){
+        request->send(200, "text/html", "Connected to Wi-Fi successfully!");
+      });
+    } else if (millis() - connectStartTime >= connectTimeout) {
+      connectAttempt = false;
+      Serial.println("Failed to connect to Wi-Fi. Please check your credentials and try again.");
+      // Inform the user of failure
+      server.on("/status", HTTP_GET, [](AsyncWebServerRequest *request){
+        request->send(200, "text/html", "Failed to connect to Wi-Fi. Please check your credentials and try again.");
+      });
+    }
+  }
+
   // Check if connected to Wi-Fi
   if (WiFi.status() == WL_CONNECTED && !ntp_initialized) {
-    Serial.println("Connected to the WiFi network");
 
     // Display message on OLED
     display.clearDisplay();
@@ -234,7 +264,7 @@ void loop() {
       }
 
       // Check if the current time is 13:00 and if the function has not been called today
-      if (timeinfo.tm_hour == 14 && timeinfo.tm_min == 7 && !function_called_today) {
+      if (timeinfo.tm_hour == 13 && timeinfo.tm_min == 05 && !function_called_today) {
         mySpecificFunction();
         function_called_today = true;
       }
@@ -258,8 +288,9 @@ void loop() {
       Serial.print(weight);
       Serial.println(" grams");
 
-      if (weight > 200) {
+      if (weight > 200 && motor_is_on) {
         motor_speed = 0;
+        motor_is_on = false;
         Serial.println("Motor stopped due to weight limit.");
         display.clearDisplay();
         display.setTextColor(SH110X_WHITE);
