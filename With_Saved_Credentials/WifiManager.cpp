@@ -18,7 +18,6 @@ const char* password_key = "wifi_password";
 // String password_key;
 
 
-
 AsyncWebServer server(80);
 Preferences preferences;
 

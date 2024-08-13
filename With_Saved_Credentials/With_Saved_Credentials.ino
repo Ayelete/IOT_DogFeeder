@@ -14,6 +14,7 @@ const int steps_per_rev = 200;
 #include <Adafruit_SH110X.h>
 #include <AccelStepper.h>
 #include <HX711.h>
+#include <Preferences.h>
 
 #include "WifiManager.h"
 #include "ScaleManager.h"
@@ -38,6 +39,7 @@ extern bool ntp_initialized;
 extern volatile bool shouldClearCredentials;
 extern int motor_speed;
 extern bool is_motor_running;
+extern Preferences preferences;
 /////////////////////////////////////////////
 
 //GLOBAL VARS
@@ -91,7 +93,7 @@ void setup() {
 
   // Create tasks for motor control and HTTP handling
   //xTaskCreatePinnedToCore(motorControlTask, "MotorControl", 10000, NULL, 2, NULL, 0); // Higher priority
-  //xTaskCreatePinnedToCore(httpTask, "HTTP", 10000, NULL, 1, NULL, 1); // Lower priority
+  xTaskCreatePinnedToCore(httpTask, "HTTP", 10000, NULL, 1, NULL, 1); // Lower priority
   }
 
 void mySpecificFunction() {
@@ -839,7 +841,7 @@ void httpTask(void *parameter) {
             mealHours[mealCount] = time_of_meal_string.substring(0, 2).toInt();  // Extract and store hour
             mealMinutes[mealCount] = time_of_meal_string.substring(3, 5).toInt();  // Extract and store minute
             mealAmounts[mealCount] = amount_of_food_string.toInt();  // Store amount of food
-
+            WriteDataToFS(mealCount, time_of_meal_string, amount_of_food_string);
             mealCount++; // Increment mealCount
           }
         }
@@ -859,7 +861,29 @@ void httpTask(void *parameter) {
 
 
 
+// void WriteDataToFS(Int counter, String time, String amount, Bool happened){
+void WriteDataToFS(int counter, String time, String amount){
+  preferences.begin("meals", false); // Open preferences in RW mode
 
+  String mealId = "meal" + String(counter+1);
+  preferences.putString((mealId + "_time").c_str(), time);
+  preferences.putString((mealId + "_amount").c_str(), amount );
+  // preferences.putBool(mealId + "_happened",happened);
+
+  preferences.end();
+
+
+  // prints just to see if working
+  preferences.begin("meals", true);
+  String saved_time = preferences.getString((mealId + "_time").c_str(), "bapbap");
+  String saved_amount = preferences.getString((mealId + "_amount").c_str(), "bap");
+
+  Serial.println("Recieved Data: " + time + ", " + amount);
+  Serial.println("Stored Data for " + mealId + ":");
+  Serial.println("hour: " + String(saved_time));
+  Serial.println("amount: " + String(saved_amount));
+
+}
 
 
 
