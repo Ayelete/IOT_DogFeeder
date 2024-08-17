@@ -21,6 +21,9 @@ bool ntp_initialized = false;
 void initTimeIfConnectedToWifi(){
       // Check if connected to Wi-Fi
   if (WiFi.status() == WL_CONNECTED && !ntp_initialized) {
+    Serial.println("Connected to the WiFi network");
+
+    // successfulConnectionMessage();
 
     // Initialize NTP
     configTime(10800, 0, ntpServer1, ntpServer2);

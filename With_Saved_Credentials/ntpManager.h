@@ -2,6 +2,7 @@
 #define NTPMANAGER_H
 
 #include "WifiManager.h"
+#include "OledManager.h"
 #include <time.h>
 #include <WiFi.h>
 

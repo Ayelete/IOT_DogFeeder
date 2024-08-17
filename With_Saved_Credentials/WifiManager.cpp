@@ -7,7 +7,7 @@
 
 
 //some constants for AP
-const char* ssid_ap = "ESP32-Access-Point";
+const char* ssid_ap = "DogFeeder";
 const char* password_ap = "123456789";
 const char* ssid_key = "wifi_ssid";
 const char* password_key = "wifi_password";
@@ -117,12 +117,14 @@ void initWifi(){
   preferences.begin("wifi", false);
   String saved_ssid = preferences.getString(ssid_key, "");
   String saved_password = preferences.getString(password_key, "");
+  preferences.end();
 
   // check if credentials exist
   if (saved_ssid.length() > 0 && saved_password.length() > 0) {
     Serial.println("Using saved Wi-Fi credentials:");
     Serial.println("SSID: " + saved_ssid);
     Serial.println("Password: " + saved_password);
+    tryingToConnectMessage(saved_ssid.c_str());
     WiFi.begin(saved_ssid.c_str(), saved_password.c_str());    
 
     int attempts = 0;
@@ -137,6 +139,7 @@ void initWifi(){
     } else {
       Serial.println("Failed to connect to saved Wi-Fi credentials, starting access point.");
       // Start the access point if Wi-Fi connection fails
+      accessPointMessage();
       WiFi.softAP(ssid_ap, password_ap);
       Serial.println("Access Point started");
     }
@@ -145,6 +148,7 @@ void initWifi(){
     Serial.println("No saved Wi-Fi credentials found, starting access point.");
     // Start the access point
     WiFi.softAP(ssid_ap, password_ap);
+    accessPointMessage();
     Serial.println("Access Point started");
   }
 
@@ -168,6 +172,7 @@ void initWifi(){
       preferences.putString(password_key, wifi_password);
       preferences.end();
       // Connect to the new Wi-Fi network
+      tryingToConnectMessage(wifi_ssid.c_str());
       WiFi.begin(wifi_ssid.c_str(), wifi_password.c_str());
       int attempts = 0;
       while (WiFi.status() != WL_CONNECTED && attempts < 20) {

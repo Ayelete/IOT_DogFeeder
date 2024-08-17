@@ -20,7 +20,7 @@ void initOLED(){
   display.setTextColor(SH110X_WHITE);
   display.setTextSize(1); // Increase text size
   display.setCursor(0,20);
-  display.print("connecting...");
+  display.print("Welcome");
   display.display();
 }
 
@@ -48,6 +48,7 @@ void successfulConnectionMessage(){
     display.display();
 }
 
+
 void wrongCredentialsMessage(){
       // Display message on OLED
     display.clearDisplay();
@@ -64,15 +65,55 @@ void wrongCredentialsMessage(){
     display.display();
 }
 
+
 void weightReachedMessage(){
     display.clearDisplay();
     display.setTextColor(SH110X_WHITE);
-    display.setTextSize(1);
+    display.setTextSize(2);
     display.setCursor(0,0);
-    display.print("Weight limit");
+    display.print("Bon");
     display.setCursor(0,20);
-    display.print("reached,");
-    display.setCursor(0,40);
-    display.print("motor stopped");
+    display.print("Appetit");
     display.display();  
+}
+
+void foodWasGivenMessage(){
+    display.clearDisplay();
+    display.setTextColor(SH110X_WHITE);
+    display.setTextSize(2);
+    display.setCursor(0,0);
+    display.print("Meal Is");
+    display.setCursor(0,20);
+    display.print("Served,");
+    display.setCursor(0,40);
+    display.print("Enjoy!");
+    display.display();  
+}
+
+
+void accessPointMessage(){
+  display.clearDisplay();
+  display.setTextColor(SH110X_WHITE);
+  display.setTextSize(1);
+  display.setCursor(0,0);
+  display.print("Access Point Started");
+  display.setCursor(0,15);
+  display.print("password: 123456789");
+  display.setCursor(0,30);
+  display.print("IP: 192.168.4.1");
+  display.setCursor(0, 45);
+  display.print("Enter IP in browser's url");
+  display.display();  
+}
+
+void tryingToConnectMessage(const char* ssid){
+  display.clearDisplay();
+  display.setTextColor(SH110X_WHITE);
+  display.setTextSize(1);
+  display.setCursor(0,0);
+  display.print("Connecting to");
+  display.setCursor(0,20);
+  display.print("WiFi:");
+  display.print(ssid);
+  display.display();  
 }
