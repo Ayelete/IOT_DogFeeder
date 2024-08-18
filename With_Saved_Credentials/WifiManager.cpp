@@ -136,6 +136,7 @@ void initWifi(){
 
     if (WiFi.status() == WL_CONNECTED) {
       Serial.println("Connected to the WiFi network");
+      AP_is_on = false;
       successfulConnectionMessage();
     } else {
       Serial.println("Failed to connect to saved Wi-Fi credentials, starting access point.");
