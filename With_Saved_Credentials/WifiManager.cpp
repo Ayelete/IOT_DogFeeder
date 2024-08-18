@@ -11,6 +11,7 @@ const char* ssid_ap = "DogFeeder";
 const char* password_ap = "123456789";
 const char* ssid_key = "wifi_ssid";
 const char* password_key = "wifi_password";
+bool AP_is_on = false;
 
 
 // Variables to store Wi-Fi credentials
@@ -141,6 +142,7 @@ void initWifi(){
       // Start the access point if Wi-Fi connection fails
       accessPointMessage();
       WiFi.softAP(ssid_ap, password_ap);
+      AP_is_on = true;
       Serial.println("Access Point started");
     }
   }
@@ -148,6 +150,7 @@ void initWifi(){
     Serial.println("No saved Wi-Fi credentials found, starting access point.");
     // Start the access point
     WiFi.softAP(ssid_ap, password_ap);
+    AP_is_on = true;
     accessPointMessage();
     Serial.println("Access Point started");
   }
@@ -182,6 +185,7 @@ void initWifi(){
 
       if (WiFi.status() == WL_CONNECTED) {
         successfulConnectionMessage();
+        AP_is_on = false;
       }
       else{ // TODO: find out why it's not called when wrong credentials are entered
         Serial.println("Failed to connect to WiFi");

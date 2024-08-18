@@ -44,6 +44,7 @@ extern const char* ssid_ap;
 extern const char* password_ap;
 extern volatile bool shouldClearCredentials;
 extern Preferences preferences;
+extern bool AP_is_on;
 /////////////////////////////////////////////
 
 //GLOBAL VARS
@@ -53,6 +54,7 @@ int mealHours[5]; // Assuming a maximum of 5 meals
 int mealMinutes[5];
 int mealAmounts[5];
 int mealCount = 0;
+
 
 String days[7] = {"Sun" ,"Mon", "Tue", "Wed" ,"Thu", "Fri", "Sat"};
 
@@ -924,10 +926,16 @@ void httpTask(void *parameter) {
         Serial.printf("HTTP GET failed, error: %d\n", httpCode);
       }
       http.end();
-    } else if( WiFi.status() != WL_CONNECTED ) {
-      Serial.println("WiFi not connected, starting Access Point");
-      accessPointMessage();
-      WiFi.softAP(ssid_ap, password_ap);
+    } else if( WiFi.status() != WL_CONNECTED && !AP_is_on) {
+      initWifi();
+      // int attempts = 0;
+      // while (WiFi.status() != WL_CONNECTED && attempts < 20) {
+      //   delay(500);
+      //   attempts++;
+      // }
+      // Serial.println("WiFi not connected, starting Access Point");
+      // accessPointMessage();
+      // WiFi.softAP(ssid_ap, password_ap);
     }
     vTaskDelay(5000 / portTICK_PERIOD_MS); // Run every 5 seconds
   
