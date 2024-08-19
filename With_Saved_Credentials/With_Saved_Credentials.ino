@@ -45,6 +45,7 @@ extern const char* password_ap;
 extern volatile bool shouldClearCredentials;
 extern Preferences preferences;
 extern bool AP_is_on;
+extern bool scale_initialized;
 /////////////////////////////////////////////
 
 //GLOBAL VARS
@@ -54,6 +55,10 @@ int mealHours[5]; // Assuming a maximum of 5 meals
 int mealMinutes[5];
 int mealAmounts[5];
 int mealCount = 0;
+
+unsigned long reversePreviousMillis = 0; // Store the last time the motor was reversed
+const long reverseInterval = 1000;       // Interval to reverse motor direction (3 seconds)
+bool reversingMotor = false;
 
 
 String days[7] = {"Sun" ,"Mon", "Tue", "Wed" ,"Thu", "Fri", "Sat"};
@@ -113,7 +118,7 @@ void setup() {
 
 void mySpecificFunction() {
   // Add your specific function logic here
-  motor_speed = 500; // put minus to change direction
+  motor_speed = 150; // put minus to change direction
   Serial.println("Spinning Clockwise...");
   is_motor_running = true;
 
@@ -837,7 +842,7 @@ void motorControlTask(void *parameter) {
             for (int i = 0; i < mealCount; i++) { // Loop through all stored meals
                 if (timeinfo.tm_hour == mealHours[i] && timeinfo.tm_min == mealMinutes[i] && !function_called_for_meal[i]) {
                     ////////////////////////////////////////////// MEASURE CURRENT AMOUNTS HERE!!!!!!!!!!!!!!!!
-                    current_amounts_for_meal[i] = scale.get_units();
+                    current_amounts_for_meal[i] = getWeight();
                     Serial.printf("AMOUNT BEFORE MEAL STARTS IS: ");
                     Serial.println(current_amounts_for_meal[i]);
                     motor_speed = 500; // Set the motor speed based on mealAmounts[i] if needed
@@ -863,6 +868,19 @@ void motorControlTask(void *parameter) {
                     is_motor_running = false;  // Stop the motor
                     activeMealIndex = -1;  // Reset the active meal index
                 }
+            }
+        }
+
+        if (currentMillis - reversePreviousMillis >= reverseInterval && is_motor_running) {
+            reversePreviousMillis = currentMillis;
+            if (!reversingMotor) {
+                motor_speed = -motor_speed; // Reverse direction
+                reversingMotor = true;
+                Serial.println("Reversing motor direction to dislodge beads...");
+            } else {
+                motor_speed = -motor_speed; // Restore original direction
+                reversingMotor = false;
+                Serial.println("Returning to original direction...");
             }
         }
 
@@ -940,9 +958,12 @@ void httpTask(void *parameter) {
     vTaskDelay(5000 / portTICK_PERIOD_MS); // Run every 5 seconds
   
   ////////////////////////////////////////////////////////// BLUE (ALWAYS)
-  float currentWeight = scale.get_units();
+
+  float currentWeight = getWeight();
   update_current_amount(currentWeight);
   update_weight_at_the_end_of_meal(currentWeight);
+  
+  
   /////////////////////////////////////////////////////////////////END BLUE//////////////////////////////////////////////////////
   
   ///////////////////////////////////////////////////////PURPLE (AT 23:59) begins at 23:45 ///////////////////////////
@@ -986,7 +1007,7 @@ void httpTask(void *parameter) {
  ///////////////////////////////////////////////////////YELLOW 00:01//////////////////////////////////////////////////////////
  bool only_do_this_shit_once6 = false;
   if(timeinfo.tm_hour == 0 && timeinfo.tm_min == 1 && !only_do_this_shit_once6){
-    currentWeight = scale.get_units();
+    currentWeight = getWeight();
     update_start_amount(currentWeight);
     only_do_this_shit_once6 = true;
   }
@@ -1016,9 +1037,12 @@ if(activeMealIndex != -1){
 
 update_name_of_the_last_meal(CurrMealName);
 
+
 update_true_happened();
 
 
+
+  
   }
 }
 
