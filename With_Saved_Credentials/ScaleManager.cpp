@@ -61,7 +61,7 @@ float getWeight(){
     Serial.print(weight);
     Serial.println(" grams");
 
-    // weight2 is less sensitive to noise, if it doesnt work in the tests uncomment this section and change the return value to weight2
+    // weight2 is less sensitive to noise, if it doesn't work in the tests uncomment this section and change the return value to weight2
     // weight2 = scale.get_units(10);
     // Serial.print("Weight2: ");
     // Serial.print(weight2);
