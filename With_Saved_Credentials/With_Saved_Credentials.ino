@@ -101,12 +101,13 @@ void setup() {
   pinMode(0, INPUT_PULLUP); // GPIO 0 (boot button) with internal pull-up
   attachInterrupt(digitalPinToInterrupt(0), handleButtonPress, FALLING);
 
+  initScale();
 
   initMotor();
 
   initOLED();
 
-  initScale();
+
   
   initWifi();
 
