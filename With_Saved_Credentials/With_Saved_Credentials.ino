@@ -48,12 +48,16 @@ extern bool AP_is_on;
 extern bool scale_initialized;
 /////////////////////////////////////////////
 
+bool do_this_once = true;
+
 //GLOBAL VARS
 unsigned long currentMillis = 0;
 // Arrays to hold meal times and amounts
 int mealHours[5]; // Assuming a maximum of 5 meals
 int mealMinutes[5];
 int mealAmounts[5];
+String mealNames[5];
+bool mealHappened[5] = {false, false, false, false, false};
 int mealCount = 0;
 
 unsigned long reversePreviousMillis = 0; // Store the last time the motor was reversed
@@ -67,7 +71,8 @@ String days[7] = {"Sun" ,"Mon", "Tue", "Wed" ,"Thu", "Fri", "Sat"};
 int activeMealIndex = -1;
 
 // Array of flags to indicate if the function has been called for each meal
-bool function_called_for_meal[5] = {false, false, false, false, false};
+bool function_called_for_meal[5] = {true, true, true, true, true};
+bool happened_array[5] = {false, false, false, false, false};
 float current_amounts_for_meal[5] = {0, 0, 0, 0, 0};
 
 bool single_use_flags[5] = {false, false, false, false, false}; //TODO: MUST MAKE THESE FALSE AT THE END OF EVERY DAYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY!
@@ -101,19 +106,18 @@ void setup() {
   pinMode(0, INPUT_PULLUP); // GPIO 0 (boot button) with internal pull-up
   attachInterrupt(digitalPinToInterrupt(0), handleButtonPress, FALLING);
 
-  initScale();
 
   initMotor();
 
   initOLED();
 
-
+  initScale();
   
   initWifi();
 
   readDataFromFDS();
   // Create tasks for motor control and HTTP handling
-  xTaskCreatePinnedToCore(motorControlTask, "MotorControl", 10000, NULL, 2, NULL, 0); // Higher priority
+  xTaskCreatePinnedToCore(motorControlTask, "MotorControl", 10000, NULL, 3, NULL, 0); // Higher priority
   xTaskCreatePinnedToCore(httpTask, "HTTP", 10000, NULL, 1, NULL, 1); // Lower priority
   }
 
@@ -137,7 +141,7 @@ void loop() {
   // If NTP is initialized, get and print current time
   if (ntp_initialized) {
     if (getLocalTime(&timeinfo)) {
-    printTimeToSerialMonitor();
+    //printTimeToSerialMonitor();
     }
     else {
       Serial.println("Failed to obtain time");
@@ -167,35 +171,36 @@ void loop() {
 
 //green after each meal
 void update_given_untill_now(float weight){
+  Serial.println("GIVEN UNTIL NOW BEING CALLED RIGHT NOWWWWW!");
     ////////////////////////////////////reading starting value of givenUntilNow //////////////////////////////
-    int x0 = 0;  // Variable to store the value of givenUntilNow
+    // int x0 = 0;  // Variable to store the value of givenUntilNow
 
-    char* documentPath0 = "Dogs/Billy/Statistics/currentDay";
-    String firestoreUrl0 = "https://firestore.googleapis.com/v1/projects/" + String(projectId) + "/databases/(default)/documents/" + String(documentPath0) + "?key=" + String(apiKey);
-    HTTPClient http0;
-    http0.begin(firestoreUrl0);
-    http0.setTimeout(3000);
+    // char* documentPath0 = "Dogs/Billy/Statistics/currentDay";
+    // String firestoreUrl0 = "https://firestore.googleapis.com/v1/projects/" + String(projectId) + "/databases/(default)/documents/" + String(documentPath0) + "?key=" + String(apiKey);
+    // HTTPClient http0;
+    // http0.begin(firestoreUrl0);
+    // http0.setTimeout(3000);
 
-    int httpCode0 = http0.GET();
-    if (httpCode0 != HTTP_CODE_OK) {
-        Serial.printf("HTTP GET failed, error: %d\n", httpCode0);
-    } else {
-        String payload0 = http0.getString();
-        Serial.println("READING THE CURRENT GIVEN_UNTIL_NOW");
+    // int httpCode0 = http0.GET();
+    // if (httpCode0 != HTTP_CODE_OK) {
+    //     Serial.printf("LINE 180: HTTP GET failed, error: %d\n", httpCode0);
+    // } else {
+    //     String payload0 = http0.getString();
+    //     Serial.println("READING THE CURRENT GIVEN_UNTIL_NOW");
 
-        DynamicJsonDocument doc0(1024);
-        DeserializationError error0 = deserializeJson(doc0, payload0);
+    //     DynamicJsonDocument doc0(1024);
+    //     DeserializationError error0 = deserializeJson(doc0, payload0);
 
-        if (!error0) {
-            x0 = doc0["fields"]["givenUntilNow"]["integerValue"].as<int>();
-            Serial.print("givenUntilNow value: ");
-            Serial.println(x0);
-        } else {
-            Serial.println("deserialize failed");
-        }
-    }
+    //     if (!error0) {
+    //         x0 = doc0["fields"]["givenUntilNow"]["integerValue"].as<int>();
+    //         Serial.print("givenUntilNow value: ");
+    //         Serial.println(x0);
+    //     } else {
+    //         Serial.println("deserialize failed");
+    //     }
+    // }
 
-    http0.end();
+    // http0.end();
   ////////////////////////////////////////////////////////////////////////////
 
     String currentMeal = CurrMealName;
@@ -225,6 +230,7 @@ void update_given_untill_now(float weight){
     // http.end();
 //I THINK ALL THIS ^^ DOES IS FETCH THE LAST MEAL NAME, BUT WE ALREADY HAVE THAT IN A GLOBAL VARIABLE
     if(currentMeal == "-"){
+      Serial.println("NOT UPDATING GIVEN UNTIL NOW LINE 227");
       return;
     }
 
@@ -238,7 +244,7 @@ void update_given_untill_now(float weight){
     //http2.setTimeout(3000);
     int httpCode2 = http2.GET();
     if (httpCode2 != HTTP_CODE_OK){
-      Serial.printf("HTTP2 GET failed IN GIVEN UNTIL NOW, error: %d\n", httpCode2);
+      Serial.printf("LINE 240: HTTP2 GET failed IN GIVEN UNTIL NOW, error: %d\n", httpCode2);
     }else{
         String payload = http2.getString();
         // Process payload
@@ -272,13 +278,21 @@ void update_given_untill_now(float weight){
         DeserializationError error = deserializeJson(doc, payload);
         DynamicJsonDocument updateDoc(1024);
         JsonObject fields = updateDoc.createNestedObject("fields");
+        //int current_given_until_now =  (int)fields["givenUntilNow"]["integerValue"];
+        int x = amountOfFood - ((int)weight) + (int)doc["fields"]["givenUntilNow"]["integerValue"];
+        Serial.printf("GIVEN UNTIL NOW (BEFORE UPDATE): %d\n", (int)doc["fields"]["givenUntilNow"]["integerValue"]);
+        Serial.printf("GIVEN UNTIL NOW TRYING TO UPDATE TO: %d\n", x);
+        Serial.printf("amountOfFood: %d\n", amountOfFood);
+        Serial.printf("current Weight: %d\n", (int)weight);
+        // Serial.printf("caclulation to be done is: given")
         fields["currentAmount"]["integerValue"] = (int)doc["fields"]["currentAmount"]["integerValue"];
-        fields["givenUntilNow"]["integerValue"] = amountOfFood - ((int)weight) + (int)x0;
+        fields["givenUntilNow"]["integerValue"] = amountOfFood - ((int)weight) + (int)doc["fields"]["givenUntilNow"]["integerValue"];
         fields["startAmount"]["integerValue"] = (int)doc["fields"]["startAmount"]["integerValue"];
+        fields["empty"]["booleanValue"] = doc["fields"]["empty"]["booleanValue"];
         
-        int val = amountOfFood - ((int)weight) + (int)x0;
-        Serial.printf("THE VALUE FOR GIVEN UNTIL NOW SHOULD BE: ");
-        Serial.println(val);
+        // int val = amountOfFood - ((int)weight) + (int)x0;
+        // Serial.printf("THE VALUE FOR GIVEN UNTIL NOW SHOULD BE: ");
+        // Serial.println(val);
         String jsonPayload;
         serializeJson(updateDoc,jsonPayload);
 
@@ -294,6 +308,7 @@ void update_given_untill_now(float weight){
      http1.end();
 }
 void update_true_happened(){
+    Serial.println("ok");
     // String currentMeal = "";
     String currentMeal = CurrMealName;
     // char* documentPath = "Dogs/Billy/Statistics/globalStats";
@@ -321,6 +336,7 @@ void update_true_happened(){
     // http.end();
 
     if(currentMeal == "-"){
+      Serial.println("I'm here! Current meal is defined as - so I'm not updating happened");
       return;
     }
 
@@ -336,15 +352,18 @@ void update_true_happened(){
      }else{
         String payload = http1.getString();
         // Process payload
-        Serial.println("HTTP GET curr, processing data...");
+        //Serial.println("HTTP GET curr, processing data...");
         DynamicJsonDocument doc(1024);
         DeserializationError error = deserializeJson(doc, payload);
         DynamicJsonDocument updateDoc(1024);
         JsonObject fields = updateDoc.createNestedObject("fields");
         fields["amountOfFood"]["stringValue"] = doc["fields"]["amountOfFood"]["stringValue"].as<String>();
+        fields["gotFoodNotifReceived"]["booleanValue"] = doc["fields"]["gotFoodNotifReceived"]["booleanValue"];
         fields["happened"]["booleanValue"] = true;
         fields["weightAtTheEndOfTheMeal"]["integerValue"] = (int)doc["fields"]["weightAtTheEndOfTheMeal"]["integerValue"];
         fields["hourOfMeal"]["stringValue"] = doc["fields"]["hourOfMeal"]["stringValue"].as<String>();
+
+        happened_array[activeMealIndex] = true;
 
         String jsonPayload;
         serializeJson(updateDoc,jsonPayload);
@@ -354,11 +373,12 @@ void update_true_happened(){
         if(patchCode == HTTP_CODE_OK){
             Serial.println("Document updated successfully");
         }else{
-            Serial.print("Faild to update document  ");
+            Serial.print("Faild to update document LINE 358 ");
             Serial.println(patchCode);
         }
      }
      http1.end();
+    
 }
 void update_name_of_the_last_meal(String name){
   char* documentPath1 = "Dogs/Billy/Statistics/globalStats";
@@ -371,7 +391,7 @@ void update_name_of_the_last_meal(String name){
      }else{
         String payload = http1.getString();
         // Process payload
-        Serial.println("HTTP GET curr, processing data...");
+        //Serial.println("HTTP GET curr, processing data...");
         DynamicJsonDocument doc(1024);
         DeserializationError error = deserializeJson(doc, payload);
         DynamicJsonDocument updateDoc(1024);
@@ -386,9 +406,9 @@ void update_name_of_the_last_meal(String name){
         http1.addHeader("Content-Type", "application/json");
         int patchCode = http1.PATCH(jsonPayload);
         if(patchCode == HTTP_CODE_OK){
-            Serial.println("Document updated successfully");
+            //Serial.println("Document updated successfully");
         }else{
-            Serial.print("Faild to update document INSIDE UPDATE NAME OF LAST MEAL");
+            Serial.print("Faild to update document INSIDE UPDATE NAME OF LAST MEAL LINE 392");
             Serial.println(patchCode);
         }
      }
@@ -417,6 +437,7 @@ void update_start_amount(float weight){
           fields["currentAmount"]["integerValue"] = doc["fields"]["currentAmount"]["integerValue"];
           fields["startAmount"]["integerValue"] = (int)weight;
           fields["givenUntilNow"]["integerValue"] = doc["fields"]["givenUntilNow"]["integerValue"];
+          fields["empty"]["booleanValue"] = doc["fields"]["empty"]["booleanValue"];
 
           String jsonPayload;
           serializeJson(updateDoc,jsonPayload);
@@ -427,7 +448,7 @@ void update_start_amount(float weight){
           if(patchCode == HTTP_CODE_OK){
             Serial.println("Document updated successfully");
           }else{
-            Serial.print("Faild to update document  ");
+            Serial.print("Faild to update document LINE 432");
             Serial.println(patchCode);
           }
         }
@@ -435,7 +456,7 @@ void update_start_amount(float weight){
           Serial.println("Failed to parse JSON");
         }
       } else {
-        Serial.printf("HTTP GET failed, error: %d\n", httpCode);
+        Serial.printf("LINE 440: HTTP GET failed, error: %d\n", httpCode);
       }
       http.end();
 }
@@ -472,7 +493,7 @@ void update_zero_last_meal_name(){
         if(patchCode == HTTP_CODE_OK){
             Serial.println("Document updated successfully");
         }else{
-            Serial.print("Faild to update document  ");
+            Serial.print("Faild to update document LINE 477 ");
             Serial.println(patchCode);
         }
      }
@@ -513,6 +534,7 @@ void update_zero_weight_at_the_end_of_meal(){
                 fields["hourOfMeal"]["stringValue"] = doc1["fields"]["hourOfMeal"]["stringValue"];
                 fields["happened"]["booleanValue"] = doc1["fields"]["happened"]["booleanValue"];
                 fields["amountOfFood"]["stringValue"] = doc1["fields"]["amountOfFood"]["stringValue"];
+                fields["gotFoodNotifReceived"]["booleanValue"] = doc1["fields"]["gotFoodNotifReceived"]["booleanValue"];
 
             String jsonPayload;
             serializeJson(updateDoc,jsonPayload);
@@ -523,7 +545,7 @@ void update_zero_weight_at_the_end_of_meal(){
           if(patchCode == HTTP_CODE_OK){
             Serial.println("Document updated successfully");
           }else{
-            Serial.print("Faild to update document  ");
+            Serial.print("Faild to update document  LINE 529");
             Serial.println(patchCode);
           }
                 
@@ -532,7 +554,7 @@ void update_zero_weight_at_the_end_of_meal(){
         }
         
         else{
-          Serial.printf("HTTP GET failed, error: %d\n", httpCode1);
+          Serial.printf("LINE 538: HTTP GET failed, error: %d\n", httpCode1);
         }
 
 
@@ -541,7 +563,7 @@ void update_zero_weight_at_the_end_of_meal(){
           Serial.println("Failed to parse JSON");
         }
       } else {
-        Serial.printf("HTTP GET failed, error: %d\n", httpCode);
+        Serial.printf("LINE 547: HTTP GET failed, error: %d\n", httpCode);
       }
       http.end();
 }
@@ -552,7 +574,7 @@ void update_to_zero_given_until_now(){
     http.begin(firestoreUrl);
     int httpCode = http.GET();
     if (httpCode != HTTP_CODE_OK){
-      Serial.printf("HTTP GET failed, error: %d\n", httpCode);
+      Serial.printf("LINE 558: HTTP GET failed, error: %d\n", httpCode);
     }
     else{
       String payload = http.getString();
@@ -569,6 +591,7 @@ void update_to_zero_given_until_now(){
             fields["currentAmount"]["integerValue"] = (int)doc["fields"]["currentAmount"]["integerValue"];
             fields["givenUntilNow"]["integerValue"] = (int)0;
             fields["startAmount"]["integerValue"] = (int)doc["fields"]["startAmount"]["integerValue"];
+            fields["empty"]["booleanValue"] = doc["fields"]["empty"]["booleanValue"];
 
             String jsonPayload;
             serializeJson(updateDoc,jsonPayload);
@@ -579,7 +602,7 @@ void update_to_zero_given_until_now(){
             if(patchCode == HTTP_CODE_OK){
               Serial.println("Document updated successfully");
             }else{
-              Serial.print("Faild to update document  ");
+              Serial.print("Faild to update document LINE 585 ");
               Serial.println(patchCode);
             }
         }
@@ -594,7 +617,7 @@ void update_total_day_amount(int day){
     http.begin(firestoreUrl);
     int httpCode = http.GET();
     if (httpCode != HTTP_CODE_OK){
-      Serial.printf("HTTP GET failed, error: %d\n", httpCode);
+      Serial.printf("LINE 600: HTTP GET failed, error: %d\n", httpCode);
     }else{
         String payload = http.getString();
         // Process payload
@@ -644,7 +667,7 @@ void update_total_day_amount(int day){
         if(patchCode == HTTP_CODE_OK){
             Serial.println("Document updated successfully");
         }else{
-            Serial.print("Faild to update document  ");
+            Serial.print("Faild to update document LINE 650 ");
             Serial.println(patchCode);
         }
      }
@@ -699,7 +722,7 @@ void update_happend_false(){
             if(patchCode == HTTP_CODE_OK){
               Serial.println("Document updated successfully");
             }else{
-              Serial.print("Faild to update document  ");
+              Serial.print("Faild to update document  LINE 705");
               Serial.println(patchCode);
             }
             http1.end();
@@ -714,7 +737,7 @@ void update_happend_false(){
           Serial.println("Failed to parse JSON");
         }
       } else {
-        Serial.printf("HTTP GET failed, error: %d\n", httpCode);
+        Serial.printf("LINE 720: HTTP GET failed, error: %d\n", httpCode);
       }
       http.end();
 }
@@ -730,7 +753,7 @@ void update_weight_at_the_end_of_meal(float weight){
       if (httpCode == HTTP_CODE_OK) {
         String payload = http.getString();
         // Process payload
-        Serial.println("HTTP GET successful, processing data...");
+        //Serial.println("HTTP GET successful, processing data...");
         DynamicJsonDocument doc(1024);
         DeserializationError error = deserializeJson(doc, payload);
         if (!error) {
@@ -755,6 +778,7 @@ void update_weight_at_the_end_of_meal(float weight){
                 fields["hourOfMeal"]["stringValue"] = doc1["fields"]["hourOfMeal"]["stringValue"];
                 fields["happened"]["booleanValue"] = doc1["fields"]["happened"]["booleanValue"];
                 fields["amountOfFood"]["stringValue"] = doc1["fields"]["amountOfFood"]["stringValue"];
+                fields["gotFoodNotifReceived"]["booleanValue"] = doc1["fields"]["gotFoodNotifReceived"]["booleanValue"];
 
             String jsonPayload;
             serializeJson(updateDoc,jsonPayload);
@@ -763,9 +787,9 @@ void update_weight_at_the_end_of_meal(float weight){
             int patchCode = http1.PATCH(jsonPayload);
 
           if(patchCode == HTTP_CODE_OK){
-            Serial.println("Document updated successfully");
+            //Serial.println("Document updated successfully");
           }else{
-            Serial.print("Faild to update document  ");
+            Serial.print("Faild to update document LINE 771");
             Serial.println(patchCode);
           }
                 
@@ -774,7 +798,7 @@ void update_weight_at_the_end_of_meal(float weight){
         }
         
         else{
-          Serial.printf("HTTP GET failed, error: %d\n", httpCode1);
+          Serial.printf("LINE 781: HTTP GET failed, error: %d\n", httpCode1);
         }
 
 
@@ -783,7 +807,7 @@ void update_weight_at_the_end_of_meal(float weight){
           Serial.println("Failed to parse JSON");
         }
       } else {
-        Serial.printf("HTTP GET failed, error: %d\n", httpCode);
+        Serial.printf("LINE 790: HTTP GET failed, error: %d\n", httpCode);
       }
       http.end();
 }
@@ -797,7 +821,7 @@ void update_current_amount(float weight){
       if (httpCode == HTTP_CODE_OK) {
         String payload = http.getString();
         // Process payload
-        Serial.println("HTTP GET successful, processing data...");
+        //Serial.println("HTTP GET successful, processing data...");
         DynamicJsonDocument doc(1024);
         DeserializationError error = deserializeJson(doc, payload);
         if (!error) {
@@ -808,6 +832,7 @@ void update_current_amount(float weight){
           fields["currentAmount"]["integerValue"] = (int)weight;
           fields["startAmount"]["integerValue"] = doc["fields"]["startAmount"]["integerValue"];
           fields["givenUntilNow"]["integerValue"] = doc["fields"]["givenUntilNow"]["integerValue"];
+          fields["empty"]["booleanValue"] = doc["fields"]["empty"]["booleanValue"];
 
           String jsonPayload;
           serializeJson(updateDoc,jsonPayload);
@@ -816,10 +841,10 @@ void update_current_amount(float weight){
           int patchCode = http.PATCH(jsonPayload);
 
           if(patchCode == HTTP_CODE_OK){
-            Serial.print("Current weight updated successfully to ");
-            Serial.println(weight);
+            //Serial.print("Current weight updated successfully to ");
+            //Serial.println(weight);
           }else{
-            Serial.print("Faild to update document  ");
+            Serial.print("Faild to update document LINE 826 ");
             Serial.println(patchCode);
           }
         
@@ -828,30 +853,57 @@ void update_current_amount(float weight){
           Serial.println("Failed to parse JSON");
         }
       } else {
-        Serial.printf("HTTP GET failed, error: %d\n", httpCode);
+        Serial.printf("LINE 836: HTTP GET failed, error: %d\n", httpCode);
       }
       http.end();
 }
 
+bool only_do_this_shit_once1 = false;
+bool only_do_this_shit_once2 = false;
+bool only_do_this_shit_once3 = false;
+bool only_do_this_shit_once4 = false;
+bool only_do_this_shit_once5 = false;
+bool only_do_this_shit_once6 = false;
+float aamount = 0.0;
 
+void change_falgs_to_false(){
+    only_do_this_shit_once1 = false;
+    only_do_this_shit_once2 = false;
+    only_do_this_shit_once3 = false;
+    only_do_this_shit_once4 = false;
+    only_do_this_shit_once5 = false;
+    only_do_this_shit_once6 = false;
+}
 //(timeinfo.tm_hour == hour && timeinfo.tm_min == minute && !function_called_today) 
 void motorControlTask(void *parameter) {
   
     while (true) {
         if (ntp_initialized && getLocalTime(&timeinfo)) {
+          if(timeinfo.tm_hour == 0 && timeinfo.tm_min == 5){
+            change_falgs_to_false();
+          }
             // Check if it's time to start the motor for any meal
             for (int i = 0; i < mealCount; i++) { // Loop through all stored meals
-                if (timeinfo.tm_hour == mealHours[i] && timeinfo.tm_min == mealMinutes[i] && !function_called_for_meal[i]) {
+            //Serial.printf("meal time: %02d:%02d\n", mealHours[i], mealMinutes[i]);
+                if (timeinfo.tm_hour == mealHours[i] && timeinfo.tm_min == mealMinutes[i] && timeinfo.tm_sec >= 55 && !function_called_for_meal[i]) {
+
+
+                    Serial.println("----------------------------------------------------");
+                    Serial.printf("meal time: %02d:%02d\n", mealHours[i], mealMinutes[i]);
                     ////////////////////////////////////////////// MEASURE CURRENT AMOUNTS HERE!!!!!!!!!!!!!!!!
-                    current_amounts_for_meal[i] = getWeight();
+                    //Serial.println("LINE 845!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+                    aamount = getWeight();
                     Serial.printf("AMOUNT BEFORE MEAL STARTS IS: ");
-                    Serial.println(current_amounts_for_meal[i]);
+                    Serial.println(aamount);
+                    //delay(3000);
                     motor_speed = 500; // Set the motor speed based on mealAmounts[i] if needed
                     is_motor_running = true;
+                    //Serial.println("LINE 851!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
                     activeMealIndex = i;  // Set the active meal index
                     foodWasGivenMessage();
                     Serial.println("Spinning Clockwise for meal " + String(i+1) + "...");
                     function_called_for_meal[i] = true; // Set the flag for this specific meal
+                    do_this_once = false;
                 }
             }
             resetMealFlagsAtMidnight(); // Reset the flags at midnight
@@ -867,7 +919,7 @@ void motorControlTask(void *parameter) {
                     stopMotor();
                     weightReachedMessage();
                     is_motor_running = false;  // Stop the motor
-                    activeMealIndex = -1;  // Reset the active meal index
+                    // activeMealIndex = -1;  // Reset the active meal index
                 }
             }
         }
@@ -877,11 +929,11 @@ void motorControlTask(void *parameter) {
             if (!reversingMotor) {
                 motor_speed = -motor_speed; // Reverse direction
                 reversingMotor = true;
-                Serial.println("Reversing motor direction to dislodge beads...");
+                //Serial.println("Reversing motor direction to dislodge beads...");
             } else {
                 motor_speed = -motor_speed; // Restore original direction
                 reversingMotor = false;
-                Serial.println("Returning to original direction...");
+                //Serial.println("Returning to original direction...");
             }
         }
 
@@ -901,15 +953,20 @@ void httpTask(void *parameter) {
       if (httpCode == HTTP_CODE_OK) {
         String payload = http.getString();
         // Process payload
-        Serial.println("HTTP GET successful, processing data...");
+        //Serial.println("HTTP GET successful, processing data...");
         DynamicJsonDocument doc(1024);
         DeserializationError error = deserializeJson(doc, payload);
         if (!error) {
           JsonArray documents = doc["documents"];
           mealCount = 0; // Reset mealCount
+          for(int i = 0; i < 5; ++i){
+            function_called_for_meal[i] = true;
+          }
           for (JsonVariant v : documents) {
             String time_of_meal_string = v["fields"]["hourOfMeal"]["stringValue"].as<String>();
             String amount_of_food_string = v["fields"]["amountOfFood"]["stringValue"].as<String>();
+            String name = v["fields"]["name"]["stringValue"].as<String>();
+            bool happened = v["fields"]["happened"]["booleanValue"].as<bool>();
             //todo check if meal time equals current time? if true : CurrMealName = v["name"] && checkk = true (note that name is not the name *slicing needed*);
             
             String hourString = time_of_meal_string.substring(0, 2);
@@ -922,14 +979,17 @@ void httpTask(void *parameter) {
               String x = v["name"];
               int lastSlashIndex = x.lastIndexOf('/');
               CurrMealName =  x.substring(lastSlashIndex + 1);
-              Serial.println(CurrMealName);
+              //Serial.println(CurrMealName);
             }
+
 
             mealHours[mealCount] = time_of_meal_string.substring(0, 2).toInt();  // Extract and store hour
             mealMinutes[mealCount] = time_of_meal_string.substring(3, 5).toInt();  // Extract and store minute
             mealAmounts[mealCount] = amount_of_food_string.toInt();  // Store amount of food
-            // mealHappened[mealCount] = happened;  // Store meal happened
+            //mealNames[mealCount] = name;
+            function_called_for_meal[mealCount] = happened;  // Store meal happened
             WriteDataToFS(mealCount, time_of_meal_string, amount_of_food_string);
+
             
             mealCount++; // Increment mealCount
           }
@@ -942,7 +1002,7 @@ void httpTask(void *parameter) {
           Serial.println("Failed to parse JSON");
         }
       } else {
-        Serial.printf("HTTP GET failed, error: %d\n", httpCode);
+        Serial.printf("LINE 952: HTTP GET failed, error: %d\n", httpCode);
       }
       http.end();
     } else if( WiFi.status() != WL_CONNECTED && !AP_is_on) {
@@ -963,41 +1023,49 @@ void httpTask(void *parameter) {
   float currentWeight = getWeight();
   update_current_amount(currentWeight);
   update_weight_at_the_end_of_meal(currentWeight);
+
   
   
   /////////////////////////////////////////////////////////////////END BLUE//////////////////////////////////////////////////////
+  //doesnt update field at all:
+if(function_called_for_meal[activeMealIndex]){
+  Serial.printf("active Meal index value = %d\n", activeMealIndex);
   
+  if(!do_this_once){
+    update_name_of_the_last_meal(CurrMealName);
+    update_true_happened();
+    update_given_untill_now(aamount);
+    do_this_once = true;
+    aamount = 0.0;
+  }
+}
   ///////////////////////////////////////////////////////PURPLE (AT 23:59) begins at 23:45 ///////////////////////////
   
   
-  bool only_do_this_shit_once1 = false;
-  if(timeinfo.tm_hour ==23 && timeinfo.tm_min == 45 && !only_do_this_shit_once1){
+  
+  if(timeinfo.tm_hour ==2 && timeinfo.tm_min == 45 && !only_do_this_shit_once1){
     int dayOfWeek = timeinfo.tm_wday;
     update_total_day_amount(dayOfWeek);
     only_do_this_shit_once1 = true;
   }
   
 
-  bool only_do_this_shit_once2 = false;
-  if(timeinfo.tm_hour == 23 && timeinfo.tm_min == 48 && !only_do_this_shit_once2){
+  if(timeinfo.tm_hour == 2 && timeinfo.tm_min == 48 && !only_do_this_shit_once2){
     update_to_zero_given_until_now();
     only_do_this_shit_once1 = true;
   }
 
-  bool only_do_this_shit_once3 = false;
-  if(timeinfo.tm_hour == 23 && timeinfo.tm_min == 51 && !only_do_this_shit_once3){
+  if(timeinfo.tm_hour == 2 && timeinfo.tm_min == 51 && !only_do_this_shit_once3){
     update_happend_false();
     only_do_this_shit_once3 = true;
   }
 
-  bool only_do_this_shit_once4 = false;
-  if(timeinfo.tm_hour == 23 && timeinfo.tm_min == 54 && !only_do_this_shit_once4){
+  if(timeinfo.tm_hour == 2 && timeinfo.tm_min == 54 && !only_do_this_shit_once4){
     update_zero_weight_at_the_end_of_meal();
     only_do_this_shit_once4 = true;
   }
-  
-  bool only_do_this_shit_once5 = false;
-  if(timeinfo.tm_hour == 23 && timeinfo.tm_min == 58 && !only_do_this_shit_once5){
+
+  if(timeinfo.tm_hour == 2 && timeinfo.tm_min == 57 && !only_do_this_shit_once5){
     update_zero_last_meal_name();
     only_do_this_shit_once5 = true;
   }
@@ -1006,8 +1074,8 @@ void httpTask(void *parameter) {
  
  
  ///////////////////////////////////////////////////////YELLOW 00:01//////////////////////////////////////////////////////////
- bool only_do_this_shit_once6 = false;
-  if(timeinfo.tm_hour == 0 && timeinfo.tm_min == 1 && !only_do_this_shit_once6){
+
+  if(timeinfo.tm_hour == 3 && timeinfo.tm_min == 0 && !only_do_this_shit_once6){
     currentWeight = getWeight();
     update_start_amount(currentWeight);
     only_do_this_shit_once6 = true;
@@ -1028,28 +1096,42 @@ void httpTask(void *parameter) {
 // bool function_called_for_meal[5] = {false, false, false, false, false};
 // float current_amounts_for_meal[5] = {0, 0, 0, 0, 0};
 
-if(activeMealIndex != -1){
-  if(!do_the_chara_once[activeMealIndex]){
-  update_given_untill_now(current_amounts_for_meal[activeMealIndex]);
-  do_the_chara_once[activeMealIndex] = true;
+// if(activeMealIndex != -1){
+//   if(!do_the_chara_once[activeMealIndex]){
+//   update_given_untill_now(current_amounts_for_meal[activeMealIndex]);
+//   do_the_chara_once[activeMealIndex] = true;
+//   }
+// }
+
+// if(!do_the_chara_once[activeMealIndex] && function_called_for_meal[activeMealIndex]){
+//   update_given_untill_now(current_amounts_for_meal[activeMealIndex]);
+//   do_the_chara_once[activeMealIndex] = true;
+//   }
+
+
+
+
+// //updates a million times (i believe after ot happens):
+// if(happened_array[activeMealIndex]){
+//   update_given_untill_now(current_amounts_for_meal[activeMealIndex]);
+// }
+
+
+
+
+
+// if(!do_the_chara_once[activeMealIndex]){
+//   update_given_untill_now(current_amounts_for_meal[activeMealIndex]);
+//   do_the_chara_once[activeMealIndex] = true;
+//   }
+
+
   }
 }
 
 
-update_name_of_the_last_meal(CurrMealName);
 
-
-update_true_happened();
-
-
-
-  
-  }
-}
-
-
-
-// void WriteDataToFS(Int counter, String time, String amount, Bool happened){
+// void WriteDataToFS(Int counter, String time, String amount, bool happened){
 void WriteDataToFS(int counter, String time, String amount){
   
   preferences.begin("meals", false); // Open preferences in RW mode
