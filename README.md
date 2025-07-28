@@ -45,12 +45,30 @@ Smart enough to only add the **difference** to the bowl — so no double feeding
 - **NTP Time Sync**  
   Pulls time from Israeli and global NTP servers for accurate daily resets.
 
----
+## 📂 File Structure
 
-## 📂 Folder Structure
+```
+.
+├── Final Version for ESP/        # Final firmware modules for ESP32 (C++ source files)
+│   ├── WifiManager.*             # Handles Wi-Fi setup, reconnection, and AP fallback
+│   ├── ScaleManager.*            # Integrates with HX711 load cell
+│   ├── MotorManager.*            # Stepper motor control logic
+│   ├── OledManager.*             # OLED display feedback and user messages
+│   ├── ntpManager.*              # NTP time sync and daily reset scheduling
+│   └── With_Saved_Credentials.ino# Entry point / main sketch file for the firmware
+│
+├── FlutterSupportApp/           # Complete Flutter app for user-facing control + stats
+│   ├── lib/                     # Dart source files
+│   ├── android/, ios/, web/     # Platform support for deployment
+│   └── pubspec.yaml             # Dependencies and app metadata
+│
+├── archive/                     # Experimental folders, older versions, and test projects
+│
+├── README.md                    # Project description, features, and setup info
+├── wiring documentation.png     # Visual circuit diagram for hardware setup
+├── wiring documentation.ckt     # Digital circuit file (e.g., Tinkercad/Fritzing)
+```
 
-
----
 
 ## 🛠 Tech Stack
 
